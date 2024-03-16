@@ -2,7 +2,6 @@ package impl
 
 import (
 	"errors"
-	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/prakash-p-3121/errorlib"
 	"strconv"
@@ -11,21 +10,23 @@ import (
 type RestClientImpl struct {
 }
 
-func (client *RestClientImpl) buildAppError(resp *resty.Response, err error) errorlib.AppError {
+func (client *RestClientImpl) buildAppError(resp *resty.Response) errorlib.AppError {
+	if resp.IsSuccess() {
+		return nil
+	}
 	statusCode := resp.StatusCode()
 	factoryFunc, ok := statusCodeToErrMap.Load(statusCode)
 	if !ok {
 		newErr := errors.New("unhandled httpStatus code =" + strconv.Itoa(statusCode))
-		err = fmt.Errorf("%w %w", err, newErr)
-		return errorlib.NewInternalServerError(err.Error())
+		return errorlib.NewInternalServerError(newErr.Error())
 	}
 	appErrFactoryFunc, ok := factoryFunc.(func(string) errorlib.AppError)
 	if !ok {
 		newErr := errors.New("cannot type cast to Factory function func(string) errorlib.AppError")
-		err = fmt.Errorf("%w %w", err, newErr)
-		return errorlib.NewInternalServerError(err.Error())
+		return errorlib.NewInternalServerError(newErr.Error())
 	}
-	return appErrFactoryFunc(err.Error())
+
+	return appErrFactoryFunc(string(resp.Body()))
 }
 
 func (client *RestClientImpl) Post(url string, request, resultPtr interface{}) errorlib.AppError {
@@ -35,9 +36,9 @@ func (client *RestClientImpl) Post(url string, request, resultPtr interface{}) e
 		SetBody(request).
 		SetResult(resultPtr).Post(url)
 	if err != nil {
-		return client.buildAppError(resp, err)
+		return errorlib.NewInternalServerError(err.Error())
 	}
-	return nil
+	return client.buildAppError(resp)
 }
 
 func (client *RestClientImpl) Get(url string, resultPtr interface{}) errorlib.AppError {
@@ -46,9 +47,9 @@ func (client *RestClientImpl) Get(url string, resultPtr interface{}) errorlib.Ap
 		SetHeader("Content-Type", "application/json").
 		SetResult(resultPtr).Get(url)
 	if err != nil {
-		return client.buildAppError(resp, err)
+		return errorlib.NewInternalServerError(err.Error())
 	}
-	return nil
+	return client.buildAppError(resp)
 }
 
 func (client *RestClientImpl) Put(url string, request, resultPtr interface{}) errorlib.AppError {
@@ -58,9 +59,9 @@ func (client *RestClientImpl) Put(url string, request, resultPtr interface{}) er
 		SetBody(request).
 		SetResult(resultPtr).Put(url)
 	if err != nil {
-		return client.buildAppError(resp, err)
+		return errorlib.NewInternalServerError(err.Error())
 	}
-	return nil
+	return client.buildAppError(resp)
 }
 
 func (client *RestClientImpl) Patch(url string, request, resultPtr interface{}) errorlib.AppError {
@@ -70,9 +71,9 @@ func (client *RestClientImpl) Patch(url string, request, resultPtr interface{}) 
 		SetBody(request).
 		SetResult(resultPtr).Patch(url)
 	if err != nil {
-		return client.buildAppError(resp, err)
+		return errorlib.NewInternalServerError(err.Error())
 	}
-	return nil
+	return client.buildAppError(resp)
 }
 
 func (client *RestClientImpl) Delete(url string, resultPtr interface{}) errorlib.AppError {
@@ -81,7 +82,7 @@ func (client *RestClientImpl) Delete(url string, resultPtr interface{}) errorlib
 		SetHeader("Content-Type", "application/json").
 		SetResult(resultPtr).Delete(url)
 	if err != nil {
-		return client.buildAppError(resp, err)
+		return errorlib.NewInternalServerError(err.Error())
 	}
-	return nil
+	return client.buildAppError(resp)
 }
